@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 
 from qftools.date.calendar import Calendar
-from qftools.date.daycount import DayCountBasis, calculate
+from qftools.date.daycount import DayCount
 
 
 @pytest.fixture
@@ -16,23 +16,103 @@ def test_act_360():
     """Test Actual/360 day count."""
     start = date(2024, 1, 1)
     end = date(2024, 2, 1)
-    result = calculate(DayCountBasis.ACT_360, start, end)
+    result = DayCount.ACT_360.year_fraction(start, end)
     assert result == pytest.approx(31 / 360)
+
+
+def test_act_365():
+    """Test Actual/365 day count."""
+    start = date(2024, 1, 1)
+    end = date(2025, 1, 1)
+    result = DayCount.ACT_365.year_fraction(start, end)
+    assert result == pytest.approx(366 / 365)  # 2024 is a leap year
+
+
+def test_act_365l():
+    """Test Actual/365L day count."""
+    # Test period including Feb 29
+    start = date(2024, 2, 28)
+    end = date(2024, 3, 1)
+    result = DayCount.ACT_365L.year_fraction(start, end)
+    assert result == pytest.approx(1 / 365)  # Feb 29 is excluded
+
+    # Test normal period
+    start = date(2024, 1, 1)
+    end = date(2024, 2, 1)
+    result = DayCount.ACT_365L.year_fraction(start, end)
+    assert result == pytest.approx(31 / 365)
+
+
+def test_act_act():
+    """Test Actual/Actual day count."""
+    # Test within same year
+    start = date(2024, 1, 1)
+    end = date(2025, 1, 1)
+    result = DayCount.ACT_ACT.year_fraction(start, end)
+    assert result == pytest.approx(1.0)  # Full year
+
+    # Test across years
+    start = date(2024, 7, 1)
+    end = date(2025, 7, 1)
+    result = DayCount.ACT_ACT.year_fraction(start, end)
+    expected = 184 / 366 + 181 / 365  # First half in leap year, second in normal year
+    assert result == pytest.approx(expected)
+
+
+def test_act_act_afb():
+    """Test Actual/Actual AFB day count."""
+    # Test period within one year
+    start = date(2024, 1, 1)
+    end = date(2025, 1, 1)
+    result = DayCount.ACT_ACT_AFB.year_fraction(start, end)
+    assert result == pytest.approx(366 / 366)  # 2024 is leap year
 
 
 def test_thirty_360():
     """Test 30/360 day count."""
+    # Test normal case
     start = date(2024, 1, 30)
     end = date(2024, 2, 28)
-    result = calculate(DayCountBasis.THIRTY_360, start, end)
+    result = DayCount.THIRTY_360.year_fraction(start, end)
     assert result == pytest.approx(28 / 360)
+
+    # Test end of month case
+    start = date(2024, 1, 31)
+    end = date(2024, 3, 31)
+    result = DayCount.THIRTY_360.year_fraction(start, end)
+    assert result == pytest.approx(60 / 360)
+
+
+def test_thirty_360_e():
+    """Test 30E/360 (Eurobond) day count."""
+    start = date(2024, 1, 31)
+    end = date(2024, 3, 31)
+    result = DayCount.THIRTY_360_E.year_fraction(start, end)
+    assert result == pytest.approx(60 / 360)  # Both dates are adjusted to 30th
+
+
+def test_thirty_360_isda():
+    """Test 30E/360 ISDA day count."""
+    start = date(2024, 2, 29)  # Last day of February in leap year
+    end = date(2025, 2, 28)  # Last day of February in normal year
+    maturity = date(2026, 2, 28)
+    result = DayCount.THIRTY_360_ISDA.year_fraction(start, end, maturity=maturity)
+    assert result == pytest.approx(361 / 360)  # One year exactly
+
+
+def test_thirty_360_us():
+    """Test 30/360 US day count."""
+    start = date(2024, 2, 29)
+    end = date(2025, 2, 28)
+    result = DayCount.THIRTY_360_US.year_fraction(start, end)
+    assert result == pytest.approx(360 / 360)
 
 
 def test_business_252(calendar):
     """Test Business/252 day count."""
     start = date(2024, 1, 1)
     end = date(2024, 1, 5)
-    result = calculate(DayCountBasis.BUSINESS_252, start, end, calendar=calendar)
+    result = DayCount.BUSINESS_252.year_fraction(start, end, calendar=calendar)
     assert result == pytest.approx(4 / 252)  # Assuming 4 business days
 
 
@@ -42,36 +122,22 @@ def test_invalid_dates():
     end = date(2024, 1, 1)
 
     with pytest.raises(ValueError, match='End date must not be before start date'):
-        calculate(DayCountBasis.ACT_360, start, end)
+        DayCount.ACT_360.year_fraction(start, end)
 
 
-def test_act_365():
-    """Test Actual/365 day count."""
+def test_missing_calendar():
+    """Test Business/252 without calendar."""
     start = date(2024, 1, 1)
-    end = date(2025, 1, 1)
-    result = calculate(DayCountBasis.ACT_365, start, end)
-    assert result == pytest.approx(366 / 365)  # 2024 is a leap year
+    end = date(2024, 1, 5)
+
+    with pytest.raises(ValueError, match='Calendar required for Business/252 calculations'):
+        DayCount.BUSINESS_252.year_fraction(start, end)
 
 
-def test_act_act():
-    """Test Actual/Actual day count."""
-    # Test within same year
+def test_missing_maturity():
+    """Test 30E/360 ISDA without maturity date."""
     start = date(2024, 1, 1)
-    end = date(2025, 1, 1)
-    result = calculate(DayCountBasis.ACT_ACT, start, end)
-    assert result == pytest.approx(366 / 366)  # 2024 is a leap year
+    end = date(2024, 12, 31)
 
-    # Test across years
-    start = date(2024, 7, 1)
-    end = date(2025, 7, 1)
-    result = calculate(DayCountBasis.ACT_ACT, start, end)
-    expected = 184 / 366 + 181 / 365  # First half in leap year, second in normal year
-    assert result == pytest.approx(expected)
-
-
-def test_thirty_360_e():
-    """Test 30E/360 (Eurobond) day count."""
-    start = date(2024, 1, 30)
-    end = date(2024, 2, 28)
-    result = calculate(DayCountBasis.THIRTY_360_E, start, end)
-    assert result == pytest.approx(28 / 360)  # Both dates are adjusted to 30th
+    with pytest.raises(ValueError, match='Maturity date required for 30E/360 ISDA calculations'):
+        DayCount.THIRTY_360_ISDA.year_fraction(start, end)
