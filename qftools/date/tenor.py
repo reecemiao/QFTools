@@ -263,7 +263,7 @@ class Tenor:
             case 12:
                 return Frequency.ANNUAL
             case _:
-                return Frequency.OTHER_FREQUENCY
+                return Frequency.OTHER
 
     def to_frequency(self) -> Frequency:
         """Convert tenor to frequency if possible.
@@ -275,7 +275,7 @@ class Tenor:
         if self.amount == 0:
             return Frequency.ONCE
         if self.amount < 0:
-            return Frequency.OTHER_FREQUENCY
+            return Frequency.OTHER
 
         try:
             match self.unit:
@@ -289,12 +289,12 @@ class Tenor:
                         if self.amount == 1
                         else Frequency.BIWEEKLY
                         if self.amount == 2
-                        else Frequency.OTHER_FREQUENCY
+                        else Frequency.OTHER
                     )
                 case TenorUnit.DAY:
-                    return Frequency.DAILY if self.amount == 1 else Frequency.OTHER_FREQUENCY
+                    return Frequency.DAILY if self.amount == 1 else Frequency.OTHER
         except ValueError:
-            return Frequency.OTHER_FREQUENCY
+            return Frequency.OTHER
 
     def __lt__(self, other: 'Tenor') -> bool:
         """Compare if this tenor is less than another tenor."""

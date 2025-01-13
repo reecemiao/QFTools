@@ -86,8 +86,8 @@ def test_tenor_to_frequency():
     assert Tenor(1, TenorUnit.DAY).to_frequency() == Frequency.DAILY
 
     # Edge cases
-    assert Tenor(-1, TenorUnit.YEAR).to_frequency() == Frequency.OTHER_FREQUENCY
-    assert Tenor(5, TenorUnit.MONTH).to_frequency() == Frequency.OTHER_FREQUENCY
+    assert Tenor(-1, TenorUnit.YEAR).to_frequency() == Frequency.OTHER
+    assert Tenor(5, TenorUnit.MONTH).to_frequency() == Frequency.OTHER
 
 
 def test_tenor_unit_conversion():
@@ -110,7 +110,7 @@ def test_tenor_negative_amounts():
     """Test Tenor behavior with negative amounts."""
     t = Tenor(-2, TenorUnit.MONTH)
     assert t.amount == -2
-    assert t.to_frequency() == Frequency.OTHER_FREQUENCY
+    assert t.to_frequency() == Frequency.OTHER
 
     # Test arithmetic with negative amounts
     assert t + Tenor(3, TenorUnit.MONTH) == Tenor(1, TenorUnit.MONTH)
