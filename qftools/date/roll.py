@@ -67,45 +67,42 @@ class RollType(Enum):
             If calendar is None or roll type is invalid
         """
         if calendar is None:
-            calendar = calendar or Calendar('default', set())
+            calendar = Calendar('default', set())
+        return self._apply_roll_convention(date_, calendar)
 
+    def _apply_roll_convention(self, date_: date, calendar: Calendar) -> date:
+        """Apply the specific roll convention."""
         match self:
             case RollType.FOLLOWING:
                 return calendar.adjust_up(date_)
-
             case RollType.PREVIOUS:
                 return calendar.adjust_down(date_)
-
             case RollType.MODIFIED_FOLLOWING:
-                result = calendar.adjust_up(date_)
-                if result.month != date_.month:
-                    return calendar.adjust_down(date_)
-                return result
-
+                return self._roll_modified_following(date_, calendar)
             case RollType.MODIFIED_PREVIOUS:
-                result = calendar.adjust_down(date_)
-                if result.month != date_.month:
-                    return calendar.adjust_up(date_)
-                return result
-
+                return self._roll_modified_previous(date_, calendar)
             case RollType.MODIFIED_FOLLOWING_EOM:
-                eom = _get_eom(date_)
-                return calendar.adjust_down(eom)
-
+                return calendar.adjust_down(_get_eom(date_))
             case RollType.UNADJUSTED_EOM:
                 return _get_eom(date_)
-
             case RollType.IMM:
                 return _get_imm_date(date_)
-
             case RollType.CAD_IMM:
                 return _get_imm_date(date_) - timedelta(days=2)
-
             case RollType.NONE:
                 return date_
-
             case _:
                 raise ValueError(f'Unknown roll type: {self}')
+
+    def _roll_modified_following(self, date_: date, calendar: Calendar) -> date:
+        """Handle modified following roll logic."""
+        result = calendar.adjust_up(date_)
+        return calendar.adjust_down(date_) if result.month != date_.month else result
+
+    def _roll_modified_previous(self, date_: date, calendar: Calendar) -> date:
+        """Handle modified previous roll logic."""
+        result = calendar.adjust_down(date_)
+        return calendar.adjust_up(date_) if result.month != date_.month else result
 
 
 def _get_eom(date_: date) -> date:
