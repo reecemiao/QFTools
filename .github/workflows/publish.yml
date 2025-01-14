@@ -13,6 +13,6 @@ jobs:
         with:
           PACKAGE_DIRECTORY: "./qftools/"
           PYTHON_VERSION: "3.13"
-          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISH_REGISTRY_PASSWORD: ${{ secrets.PUBLISH_REGISTRY_PASSWORD }}
           PUBLISH_REGISTRY: "https://test.pypi.org/legacy/"
