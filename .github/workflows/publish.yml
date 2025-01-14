@@ -15,5 +15,4 @@ jobs:
           PYTHON_VERSION: "3.13"
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           PUBLISH_REGISTRY_PASSWORD: ${{ secrets.PUBLISH_REGISTRY_PASSWORD }}
-          PUBLISH_REGISTRY_USER: ${{ secrets.PUBLISH_REGISTRY_USER }}
-          PUBLISH_REGISTRY: "https://pypi.code-specialist.com/simple/"
+          PUBLISH_REGISTRY: "https://test.pypi.org/legacy/"
