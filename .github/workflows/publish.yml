@@ -1,0 +1,19 @@
+on:
+  release:
+    types: [ published ]
+
+jobs:
+  publish-service-client-package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish PyPI package
+        uses: code-specialist/pypi-poetry-publish@v1
+        with:
+          PACKAGE_DIRECTORY: "./qftools/"
+          PYTHON_VERSION: "3.13"
+          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          PUBLISH_REGISTRY_PASSWORD: ${{ secrets.PUBLISH_REGISTRY_PASSWORD }}
+          PUBLISH_REGISTRY_USER: ${{ secrets.PUBLISH_REGISTRY_USER }}
+          PUBLISH_REGISTRY: "https://pypi.code-specialist.com/simple/"
