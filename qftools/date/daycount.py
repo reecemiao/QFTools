@@ -370,7 +370,7 @@ class DayCount(Enum):
         if cls._check_period_alignment(start, payment, months_per_period) and cls._check_date_alignment(start, payment):
             return (end - start).days / ((payment - start).days * freq_factor)
 
-        current, target, direction = cls._get_period_dates(start, payment, maturity, months_per_period)
+        current, target, direction = cls._get_period_dates(start, payment, maturity)
 
         total_fraction = 0.0
         while direction * (current - target).days < 0:
@@ -565,7 +565,14 @@ class DayCount(Enum):
         """Validate and calculate ACT/ACT ICMA day count."""
         if not all([maturity, payment, frequency]):
             raise ValueError('Maturity, payment dates and frequency required for ACT/ACT ICMA')
-        if frequency in (Frequency.ONCE, Frequency.BIWEEKLY, Frequency.WEEKLY, Frequency.DAILY, Frequency.OTHER):
+        if frequency in (
+            Frequency.ONCE,
+            Frequency.BIWEEKLY,
+            Frequency.WEEKLY,
+            Frequency.DAILY,
+            Frequency.OTHER,
+            Frequency.CONTINUOUS,
+        ):
             raise ValueError('Frequency must not be ONCE, BIWEEKLY, WEEKLY, DAILY, or OTHER for ACT/ACT ICMA')
         return self._act_act_icma(start, end, maturity, payment, frequency)
 
@@ -575,7 +582,14 @@ class DayCount(Enum):
         """Validate and calculate ACT/365 ICMA day count."""
         if not all([maturity, payment, frequency]):
             raise ValueError('Maturity, payment dates and frequency required for ACT/365 ICMA')
-        if frequency in (Frequency.ONCE, Frequency.BIWEEKLY, Frequency.WEEKLY, Frequency.DAILY, Frequency.OTHER):
+        if frequency in (
+            Frequency.ONCE,
+            Frequency.BIWEEKLY,
+            Frequency.WEEKLY,
+            Frequency.DAILY,
+            Frequency.OTHER,
+            Frequency.CONTINUOUS,
+        ):
             raise ValueError('Frequency must not be ONCE, BIWEEKLY, WEEKLY, DAILY, or OTHER for ACT/365 ICMA')
         return self._act_365_icma(start, end, maturity, payment, frequency)
 

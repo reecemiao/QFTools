@@ -91,6 +91,10 @@ class Tenor:
         """
         if freq == Frequency.ONCE:
             return cls(0, TenorUnit.YEAR)
+        elif freq == Frequency.CONTINUOUS:
+            raise ValueError('Cannot convert CONTINUOUS frequency to tenor')
+        elif freq == Frequency.BIANNUAL:
+            return cls(2, TenorUnit.YEAR)
         elif freq == Frequency.ANNUAL:
             return cls(1, TenorUnit.YEAR)
         elif freq in (Frequency.SEMIANNUAL, Frequency.QUARTERLY, Frequency.BIMONTHLY, Frequency.MONTHLY):

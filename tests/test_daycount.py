@@ -254,3 +254,62 @@ def test_frequency_validation():
 
     with pytest.raises(ValueError):
         DayCount.ACT_ACT_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=Frequency.OTHER)
+
+
+def test_act_365_icma_with_frequencies():
+    """Test ACT/365 ICMA with different frequencies."""
+    start = date(2024, 1, 1)
+    end = date(2024, 12, 31)
+    maturity = date(2026, 12, 31)
+
+    test_cases = [
+        (Frequency.ANNUAL, date(2024, 12, 31), 1.0),
+        (Frequency.SEMIANNUAL, date(2024, 6, 30), 0.4958904109589),
+        (Frequency.QUARTERLY, date(2024, 3, 31), 0.2465753424657),
+        (Frequency.MONTHLY, date(2024, 1, 31), 0.0821917808219),
+    ]
+
+    for freq, payment, expected in test_cases:
+        result = DayCount.ACT_365_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=freq)
+        assert result == pytest.approx(expected, rel=1e-10), f'Failed for frequency {freq}'
+
+
+def test_act_act_icma_with_frequencies():
+    """Test ACT/ACT ICMA with different frequencies."""
+    start = date(2024, 1, 1)  # Leap year
+    end = date(2024, 12, 31)
+    maturity = date(2026, 12, 31)
+
+    test_cases = [
+        (Frequency.ANNUAL, date(2024, 12, 31), -0.9972677595628),
+        (Frequency.SEMIANNUAL, date(2024, 6, 30), -0.49453551912568),
+        (Frequency.QUARTERLY, date(2024, 3, 31), -0.24725274725275),
+        (Frequency.MONTHLY, date(2024, 1, 31), -0.08064516129032),
+    ]
+
+    for freq, payment, expected in test_cases:
+        result = DayCount.ACT_ACT_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=freq)
+        assert result == pytest.approx(expected, rel=1e-10), f'Failed for frequency {freq}'
+
+
+def test_icma_invalid_frequencies():
+    """Test ICMA calculations with invalid frequencies."""
+    start = date(2024, 1, 1)
+    end = date(2024, 12, 31)
+    maturity = date(2026, 12, 31)
+    payment = date(2024, 12, 31)
+
+    invalid_frequencies = [
+        Frequency.ONCE,
+        Frequency.BIWEEKLY,
+        Frequency.WEEKLY,
+        Frequency.DAILY,
+        Frequency.CONTINUOUS,
+        Frequency.OTHER,
+    ]
+
+    for freq in invalid_frequencies:
+        with pytest.raises(ValueError, match='Frequency must not be'):
+            DayCount.ACT_ACT_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=freq)
+        with pytest.raises(ValueError, match='Frequency must not be'):
+            DayCount.ACT_365_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=freq)

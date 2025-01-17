@@ -127,3 +127,36 @@ def test_tenor_invalid_operations():
 
     with pytest.raises(ValueError, match='cannot be divided'):
         Tenor(5, TenorUnit.MONTH) / 2
+
+
+def test_tenor_from_frequency_edge_cases():
+    """Test edge cases for creating Tenor from Frequency."""
+    # Test ONCE frequency
+    assert Tenor.from_frequency(Frequency.ONCE) == Tenor(0, TenorUnit.YEAR)
+
+    # Test BIANNUAL frequency
+    assert Tenor.from_frequency(Frequency.BIANNUAL) == Tenor(2, TenorUnit.YEAR)
+
+    # Test invalid frequencies
+    with pytest.raises(ValueError, match='Cannot convert CONTINUOUS frequency to tenor'):
+        Tenor.from_frequency(Frequency.CONTINUOUS)
+
+    with pytest.raises(ValueError, match='Unknown frequency'):
+        Tenor.from_frequency(Frequency.OTHER)
+
+
+def test_tenor_from_frequency_standard_cases():
+    """Test standard cases for creating Tenor from Frequency."""
+    test_cases = [
+        (Frequency.ANNUAL, Tenor(1, TenorUnit.YEAR)),
+        (Frequency.SEMIANNUAL, Tenor(6, TenorUnit.MONTH)),
+        (Frequency.QUARTERLY, Tenor(3, TenorUnit.MONTH)),
+        (Frequency.BIMONTHLY, Tenor(2, TenorUnit.MONTH)),
+        (Frequency.MONTHLY, Tenor(1, TenorUnit.MONTH)),
+        (Frequency.BIWEEKLY, Tenor(2, TenorUnit.WEEK)),
+        (Frequency.WEEKLY, Tenor(1, TenorUnit.WEEK)),
+        (Frequency.DAILY, Tenor(1, TenorUnit.DAY)),
+    ]
+
+    for freq, expected in test_cases:
+        assert Tenor.from_frequency(freq) == expected, f'Failed for frequency {freq}'

@@ -31,7 +31,6 @@ class Frequency(Enum):
         Continuous occurrences (999)
     OTHER : int
         Other occurrences (9999)
-
     """
 
     ONCE = 0
