@@ -155,14 +155,15 @@ class DayCount(Enum):
         """
         Actual/365 ICMA day count.
 
-        This convention is similar to ACT/ACT ICMA but uses 365 as a fixed denominator. It has special
-        handling for periods that exceed the standard length.
+        This convention divides the actual number of days by 365, then divides by the frequency.
+        It's commonly used for money market instruments.
 
         Key features:
-        1. Uses actual days for numerator
-        2. Uses 365 as fixed denominator
-        3. Special handling for long periods
-        4. Considers payment frequency for period calculations
+        1. Uses actual days in numerator
+        2. Uses 365 days in denominator
+        3. Considers payment frequency for period calculations
+        4. Special handling for non-aligned periods
+        5. Different calculation for forward/backward periods
 
         Parameters
         ----------
@@ -171,7 +172,7 @@ class DayCount(Enum):
         end : date
             End date of the period
         maturity : date
-            Final maturity date of the instrument
+            Final maturity date
         payment : date
             Next payment date
         frequency : Frequency
@@ -182,11 +183,8 @@ class DayCount(Enum):
         float
             Year fraction according to ACT/365 ICMA convention
         """
-        if not payment or not maturity:
-            raise ValueError('Payment and maturity dates required for ACT/365 ICMA')
-
-        freq_factor = frequency.value if frequency.value > 0 else -1 / frequency.value
-        months_per_period = int(12 // freq_factor)
+        freq_factor = frequency.annual_frequency()
+        months_per_period = int(frequency.period_months())
 
         # Check if dates align with frequency
         if cls._check_period_alignment(start, payment, months_per_period) and cls._check_date_alignment(start, payment):
@@ -366,8 +364,8 @@ class DayCount(Enum):
         float
             Year fraction according to ACT/ACT ICMA convention
         """
-        freq_factor = frequency.value if frequency.value > 0 else -1 / frequency.value
-        months_per_period = int(12 // freq_factor)
+        freq_factor = frequency.annual_frequency()
+        months_per_period = int(frequency.period_months())
 
         if cls._check_period_alignment(start, payment, months_per_period) and cls._check_date_alignment(start, payment):
             return (end - start).days / ((payment - start).days * freq_factor)

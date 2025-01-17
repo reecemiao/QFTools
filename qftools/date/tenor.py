@@ -94,7 +94,8 @@ class Tenor:
         elif freq == Frequency.ANNUAL:
             return cls(1, TenorUnit.YEAR)
         elif freq in (Frequency.SEMIANNUAL, Frequency.QUARTERLY, Frequency.BIMONTHLY, Frequency.MONTHLY):
-            return cls(12 // freq.value, TenorUnit.MONTH)
+            months = freq.period_months()
+            return cls(int(months), TenorUnit.MONTH)
         elif freq in (Frequency.BIWEEKLY, Frequency.WEEKLY):
             return cls(52 // freq.value, TenorUnit.WEEK)
         elif freq == Frequency.DAILY:

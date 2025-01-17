@@ -114,7 +114,7 @@ class DateMath:
         calendar = calendar or Calendar('default', set())
 
         dates = []
-        months_per_period = 12 // abs(frequency.value)
+        months_per_period = int(frequency.period_months())
 
         if not reverse:
             if roll != start:
