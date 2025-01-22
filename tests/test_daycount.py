@@ -10,7 +10,7 @@ from qftools.date.frequency import Frequency
 @pytest.fixture
 def calendar():
     """Sample calendar for testing."""
-    return Calendar('Test Calendar', [date(2024, 1, 1)])
+    return Calendar('Test Calendar', [date(2024, 1, 1), date(2024, 12, 25)])
 
 
 def test_act_360():
@@ -109,6 +109,62 @@ def test_thirty_360_us():
     assert result == pytest.approx(360 / 360)
 
 
+def test_thirty_360_month_end():
+    """Test month-end handling in 30/360 conventions."""
+    test_cases = [
+        # Start and end on month ends
+        (
+            date(2024, 1, 31),
+            date(2024, 2, 29),
+            {
+                DayCount.THIRTY_360: 29 / 360,  # 31->30, 29->29
+                DayCount.THIRTY_360_E: 29 / 360,  # 31->30, 29->29
+                DayCount.THIRTY_360_ISDA: 30 / 360,  # 31->30, 29->30
+                DayCount.THIRTY_360_US: 29 / 360,  # 31->30, 29->29
+            },
+        ),
+        # Start on month end, end mid-month
+        (
+            date(2024, 1, 31),
+            date(2024, 2, 15),
+            {
+                DayCount.THIRTY_360: 15 / 360,  # 31->30, 15->15
+                DayCount.THIRTY_360_E: 15 / 360,  # 31->30, 15->15
+                DayCount.THIRTY_360_ISDA: 15 / 360,  # 31->30, 15->15
+                DayCount.THIRTY_360_US: 15 / 360,  # 31->30, 15->15
+            },
+        ),
+        # Start mid-month, end on month end
+        (
+            date(2024, 1, 15),
+            date(2024, 2, 29),
+            {
+                DayCount.THIRTY_360: 44 / 360,  # 15->15, 29->29
+                DayCount.THIRTY_360_E: 44 / 360,  # 15->15, 29->29
+                DayCount.THIRTY_360_ISDA: 45 / 360,  # 15->15, 29->30
+                DayCount.THIRTY_360_US: 44 / 360,  # 15->15, 29->29
+            },
+        ),
+        # February to February (leap year to non-leap year)
+        (
+            date(2024, 2, 29),
+            date(2025, 2, 28),
+            {
+                DayCount.THIRTY_360: 359 / 360,  # 29->29, 28->28
+                DayCount.THIRTY_360_E: 359 / 360,  # 29->29, 28->28
+                DayCount.THIRTY_360_ISDA: 361 / 360,  # 29->29, 28->30
+                DayCount.THIRTY_360_US: 360 / 360,  # Feb end special case
+            },
+        ),
+    ]
+
+    for start, end, expected_results in test_cases:
+        for convention, expected in expected_results.items():
+            maturity = date(2026, 12, 31)  # Far future maturity for ISDA
+            result = convention.fraction(start, end, maturity=maturity)
+            assert result == pytest.approx(expected), f'Failed for {convention} from {start} to {end}'
+
+
 def test_business_252(calendar):
     """Test Business/252 day count."""
     start = date(2024, 1, 1)
@@ -163,7 +219,7 @@ def test_act_act_icma():
     result = DayCount.ACT_ACT_ICMA.fraction(
         start, end, maturity=maturity, payment=payment, frequency=Frequency.SEMIANNUAL
     )
-    assert result == pytest.approx(0.417582417582)
+    assert result == pytest.approx(0.4175824175824176)
 
     # Test ultimo dates
     start = date(2024, 1, 31)
@@ -173,6 +229,56 @@ def test_act_act_icma():
         start, end, maturity=maturity, payment=payment, frequency=Frequency.SEMIANNUAL
     )
     assert result == pytest.approx(0.5)
+
+
+def test_act_act_icma_with_aligned_frequencies():
+    """Test ACT/ACT ICMA with different frequencies."""
+    start = date(2024, 1, 1)  # Leap year
+    maturity = date(2026, 1, 1)
+
+    test_cases = [
+        (Frequency.ANNUAL, date(2024, 12, 1), date(2025, 1, 1), 0.9153005464480874),
+        (Frequency.SEMIANNUAL, date(2024, 6, 1), date(2024, 7, 1), 0.4175824175824176),
+        (Frequency.QUARTERLY, date(2024, 3, 1), date(2024, 4, 1), 0.16483516483516483),
+        (Frequency.MONTHLY, date(2024, 1, 15), date(2024, 2, 1), 0.03763440860215054),
+    ]
+
+    for freq, end, payment, expected in test_cases:
+        result = DayCount.ACT_ACT_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=freq)
+        assert result == pytest.approx(expected, rel=1e-10), f'Failed for frequency {freq}'
+
+
+def test_act_act_icma_with_long_stub():
+    """Test ACT/ACT ICMA with long stub period."""
+    start = date(2024, 1, 1)  # Leap year
+    maturity = date(2026, 1, 1)
+
+    test_cases = [
+        (Frequency.ANNUAL, date(2025, 1, 15), date(2025, 2, 1), 1.0384834194176211),
+        (Frequency.SEMIANNUAL, date(2024, 7, 15), date(2024, 8, 1), 0.537535833731486),
+        (Frequency.QUARTERLY, date(2024, 4, 15), date(2024, 5, 1), 0.28979468599033814),
+        (Frequency.MONTHLY, date(2024, 2, 15), date(2024, 3, 1), 0.1235632183908046),
+    ]
+
+    for freq, end, payment, expected in test_cases:
+        result = DayCount.ACT_ACT_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=freq)
+        assert result == pytest.approx(expected, rel=1e-10), f'Failed for frequency {freq}'
+
+
+def test_act_act_icma_with_long_stub_maturity():
+    """Test ACT/ACT ICMA with long stub period, maturity is payment."""
+    start = date(2024, 1, 1)  # Leap year
+
+    test_cases = [
+        (Frequency.ANNUAL, date(2025, 1, 15), date(2025, 2, 1), 1.0383561643835617),
+        (Frequency.SEMIANNUAL, date(2024, 7, 15), date(2024, 8, 1), 0.5380434782608696),
+        (Frequency.QUARTERLY, date(2024, 4, 15), date(2024, 5, 1), 0.28846153846153844),
+        (Frequency.MONTHLY, date(2024, 2, 15), date(2024, 3, 1), 0.1235632183908046),
+    ]
+
+    for freq, end, payment, expected in test_cases:
+        result = DayCount.ACT_ACT_ICMA.fraction(start, end, maturity=payment, payment=payment, frequency=freq)
+        assert result == pytest.approx(expected, rel=1e-10), f'Failed for frequency {freq}'
 
 
 def test_act_365_icma():
@@ -188,13 +294,63 @@ def test_act_365_icma():
     assert result == pytest.approx(182 / 365)  # Days in period / 365
 
     # Test period exceeding standard length
-    start = date(2024, 1, 1)
-    end = date(2024, 7, 15)  # 15 days more than standard period
-    payment = date(2024, 7, 1)
+    start = date(2024, 3, 1)
+    end = date(2024, 8, 31)
+    payment = date(2024, 9, 1)  # 15 days more than standard period
     result = DayCount.ACT_365_ICMA.fraction(
         start, end, maturity=maturity, payment=payment, frequency=Frequency.SEMIANNUAL
     )
     assert result == pytest.approx(0.5 - 1 / 365)  # Special case handling
+
+
+def test_act_365_icma_with_aligned_frequencies():
+    """Test ACT/365 ICMA with different frequencies."""
+    start = date(2024, 1, 1)
+    maturity = date(2025, 1, 1)
+
+    test_cases = [
+        (Frequency.ANNUAL, date(2024, 12, 1), date(2025, 1, 1), 0.9178082191780822),
+        (Frequency.SEMIANNUAL, date(2024, 6, 1), date(2024, 7, 1), 0.41643835616438357),
+        (Frequency.QUARTERLY, date(2024, 3, 1), date(2024, 4, 1), 0.1643835616438356),
+        (Frequency.MONTHLY, date(2024, 1, 15), date(2024, 2, 1), 0.038356164383561646),
+    ]
+
+    for freq, end, payment, expected in test_cases:
+        result = DayCount.ACT_365_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=freq)
+        assert result == pytest.approx(expected, rel=1e-10), f'Failed for frequency {freq}'
+
+
+def test_act_365_icma_with_long_stub():
+    """Test ACT/365 ICMA with long stub period."""
+    start = date(2024, 1, 1)  # Leap year
+    maturity = date(2026, 1, 1)
+
+    test_cases = [
+        (Frequency.ANNUAL, date(2025, 1, 15), date(2025, 2, 1), 1.0410958904109588),
+        (Frequency.SEMIANNUAL, date(2024, 7, 15), date(2024, 8, 1), 0.536986301369863),
+        (Frequency.QUARTERLY, date(2024, 4, 15), date(2024, 5, 1), 0.2876712328767123),
+        (Frequency.MONTHLY, date(2024, 2, 15), date(2024, 3, 1), 0.12168949771689497),
+    ]
+
+    for freq, end, payment, expected in test_cases:
+        result = DayCount.ACT_365_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=freq)
+        assert result == pytest.approx(expected, rel=1e-10), f'Failed for frequency {freq}'
+
+
+def test_act_365_icma_with_long_stub_maturity():
+    """Test ACT/365 ICMA with long stub period, maturity is payment."""
+    start = date(2024, 1, 1)  # Leap year
+
+    test_cases = [
+        (Frequency.ANNUAL, date(2025, 1, 15), date(2025, 2, 1), 1.0383561643836),
+        (Frequency.SEMIANNUAL, date(2024, 7, 15), date(2024, 8, 1), 0.5383561643835616),
+        (Frequency.QUARTERLY, date(2024, 4, 15), date(2024, 5, 1), 0.28835616438356165),
+        (Frequency.MONTHLY, date(2024, 2, 15), date(2024, 3, 1), 0.12168949771689497),
+    ]
+
+    for freq, end, payment, expected in test_cases:
+        result = DayCount.ACT_365_ICMA.fraction(start, end, maturity=payment, payment=payment, frequency=freq)
+        assert result == pytest.approx(expected, rel=1e-10), f'Failed for frequency {freq}'
 
 
 def test_icma_validation():
@@ -256,42 +412,6 @@ def test_frequency_validation():
         DayCount.ACT_ACT_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=Frequency.OTHER)
 
 
-def test_act_365_icma_with_frequencies():
-    """Test ACT/365 ICMA with different frequencies."""
-    start = date(2024, 1, 1)
-    end = date(2024, 12, 31)
-    maturity = date(2026, 12, 31)
-
-    test_cases = [
-        (Frequency.ANNUAL, date(2024, 12, 31), 1.0),
-        (Frequency.SEMIANNUAL, date(2024, 6, 30), 0.4958904109589),
-        (Frequency.QUARTERLY, date(2024, 3, 31), 0.2465753424657),
-        (Frequency.MONTHLY, date(2024, 1, 31), 0.0821917808219),
-    ]
-
-    for freq, payment, expected in test_cases:
-        result = DayCount.ACT_365_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=freq)
-        assert result == pytest.approx(expected, rel=1e-10), f'Failed for frequency {freq}'
-
-
-def test_act_act_icma_with_frequencies():
-    """Test ACT/ACT ICMA with different frequencies."""
-    start = date(2024, 1, 1)  # Leap year
-    end = date(2024, 12, 31)
-    maturity = date(2026, 12, 31)
-
-    test_cases = [
-        (Frequency.ANNUAL, date(2024, 12, 31), -0.9972677595628),
-        (Frequency.SEMIANNUAL, date(2024, 6, 30), -0.49453551912568),
-        (Frequency.QUARTERLY, date(2024, 3, 31), -0.24725274725275),
-        (Frequency.MONTHLY, date(2024, 1, 31), -0.08064516129032),
-    ]
-
-    for freq, payment, expected in test_cases:
-        result = DayCount.ACT_ACT_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=freq)
-        assert result == pytest.approx(expected, rel=1e-10), f'Failed for frequency {freq}'
-
-
 def test_icma_invalid_frequencies():
     """Test ICMA calculations with invalid frequencies."""
     start = date(2024, 1, 1)
@@ -313,3 +433,85 @@ def test_icma_invalid_frequencies():
             DayCount.ACT_ACT_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=freq)
         with pytest.raises(ValueError, match='Frequency must not be'):
             DayCount.ACT_365_ICMA.fraction(start, end, maturity=maturity, payment=payment, frequency=freq)
+
+
+def test_leap_year_handling():
+    """Test day count handling across leap years."""
+    # Test period spanning leap day
+    start = date(2024, 2, 28)  # 2024 is leap year
+    end = date(2024, 3, 1)
+
+    test_cases = [
+        (DayCount.ACT_360, 2 / 360),  # 2 actual days / 360
+        (DayCount.ACT_365, 2 / 365),  # 2 actual days / 365
+        (DayCount.ACT_365_NL, 1 / 365),  # Feb 29 excluded
+        (DayCount.ACT_ACT, 2 / 366),  # 2 days in leap year
+    ]
+
+    for convention, expected in test_cases:
+        result = convention.fraction(start, end)
+        assert result == pytest.approx(expected), f'Failed for {convention}'
+
+    # Test full leap year
+    start = date(2024, 1, 1)
+    end = date(2025, 1, 1)
+
+    test_cases = [
+        (DayCount.ACT_360, 366 / 360),
+        (DayCount.ACT_365, 366 / 365),
+        (DayCount.ACT_365_NL, 365 / 365),
+        (DayCount.ACT_ACT, 1.0),
+        (DayCount.THIRTY_360, 1.0),
+        (DayCount.THIRTY_360_E, 1.0),
+    ]
+
+    for convention, expected in test_cases:
+        result = convention.fraction(start, end)
+        assert result == pytest.approx(expected), f'Failed for {convention}'
+
+    # Test period spanning multiple leap years
+    start = date(2024, 1, 1)  # Leap year
+    end = date(2029, 1, 1)  # Next leap year
+
+    result = DayCount.ACT_ACT.fraction(start, end)
+    assert result == pytest.approx(5.0), 'Failed for multi-year period'
+
+
+def test_business_252_scenarios(calendar):
+    """Test Business/252 convention with various scenarios."""
+    test_cases = [
+        # Regular week (5 business days)
+        (
+            date(2024, 1, 2),  # Tuesday
+            date(2024, 1, 6),  # Saturday
+            4 / 252,  # 4 business days
+        ),
+        # Week with holiday
+        (
+            date(2024, 1, 1),  # New Year's Day (Holiday)
+            date(2024, 1, 6),  # Saturday
+            4 / 252,  # 4 business days (excluding holiday)
+        ),
+        # Full month
+        (
+            date(2024, 1, 1),
+            date(2024, 1, 31),
+            22 / 252,  # Typical business days in January 2024
+        ),
+        # Period spanning holiday
+        (
+            date(2024, 12, 24),
+            date(2024, 12, 26),
+            2 / 252,  # Only Dec 24 and 26 are business days
+        ),
+    ]
+
+    for start, end, expected in test_cases:
+        result = DayCount.BUSINESS_252.fraction(start, end, calendar=calendar)
+        assert result == pytest.approx(expected), f'Failed for period {start} to {end}'
+
+    # Test full year
+    start = date(2024, 1, 1)
+    end = date(2024, 12, 31)
+    result = DayCount.BUSINESS_252.fraction(start, end, calendar=calendar)
+    assert result == pytest.approx(52 * 5 / 252), 'Failed for full year'  # Assuming ~250 business days in 2024

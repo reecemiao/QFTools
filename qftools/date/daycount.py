@@ -380,7 +380,7 @@ class DayCount(Enum):
 
             days = (period_end - period_start).days
             if days > 0:
-                total_fraction += days / (next_date - current).days
+                total_fraction += direction * days / (next_date - current).days
 
             current = next_date
 
@@ -551,6 +551,10 @@ class DayCount(Enum):
         """Validate and calculate 30E/360 ISDA day count."""
         if maturity is None:
             raise ValueError('Maturity date required for 30E/360 ISDA calculations')
+        if maturity < start:
+            raise ValueError('Maturity date must be greater than start date for 30E/360 ISDA')
+        if maturity < end:
+            raise ValueError('Maturity date must be greater than end date for 30E/360 ISDA')
         return self._thirty_360_isda(start, end, maturity)
 
     def _validate_and_calc_business(self, start: date, end: date, calendar: Optional[Calendar]) -> float:
@@ -565,6 +569,10 @@ class DayCount(Enum):
         """Validate and calculate ACT/ACT ICMA day count."""
         if not all([maturity, payment, frequency]):
             raise ValueError('Maturity, payment dates and frequency required for ACT/ACT ICMA')
+        if maturity < payment:
+            raise ValueError('Maturity date must be greater than payment date for ACT/ACT ICMA')
+        if payment < end:
+            raise ValueError('Payment date must be greater than end date for ACT/ACT ICMA')
         if frequency in (
             Frequency.ONCE,
             Frequency.BIWEEKLY,
@@ -582,6 +590,10 @@ class DayCount(Enum):
         """Validate and calculate ACT/365 ICMA day count."""
         if not all([maturity, payment, frequency]):
             raise ValueError('Maturity, payment dates and frequency required for ACT/365 ICMA')
+        if maturity < payment:
+            raise ValueError('Maturity date must be greater than payment date for ACT/365 ICMA')
+        if payment < end:
+            raise ValueError('Payment date must be greater than end date for ACT/365 ICMA')
         if frequency in (
             Frequency.ONCE,
             Frequency.BIWEEKLY,
@@ -613,15 +625,13 @@ class DayCount(Enum):
         """Get new month after adding number of months."""
         total = month + number
         if total <= 0:
-            return total % 12 + 12
+            return total % 12
         return (total - 1) % 12 + 1
 
     @staticmethod
     def _get_new_year(year: int, month: int, number: int) -> int:
         """Get new year after adding number of months."""
         total = month + number
-        if total <= 0:
-            return year - 1 + total // 12
         return year + (total - 1) // 12
 
     @staticmethod

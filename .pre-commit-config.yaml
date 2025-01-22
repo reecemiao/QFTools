@@ -15,8 +15,8 @@ repos:
     description: "Run 'ruff' for extremely fast Python linting"
     entry: ruff check --force-exclude
     language: python
-    types_or: [python, pyi, jupyter]
-    args: [--fix]
+    types_or: [ python, pyi, jupyter ]
+    args: [ --fix ]
     require_serial: true
     additional_dependencies: []
     minimum_pre_commit_version: "2.9.2"
@@ -26,7 +26,7 @@ repos:
     description: "Run 'ruff format' for extremely fast Python formatting"
     entry: ruff format --force-exclude
     language: python
-    types_or: [python, pyi, jupyter]
+    types_or: [ python, pyi, jupyter ]
     args: []
     require_serial: true
     additional_dependencies: []
@@ -56,5 +56,5 @@ repos:
     entry: poetry install
     language: python
     pass_filenames: false
-    stages: [post-checkout, post-merge]
+    stages: [ post-checkout, post-merge ]
     always_run: true
