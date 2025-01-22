@@ -67,6 +67,44 @@ class DateMath:
         return result
 
     @staticmethod
+    def _generate_forward_dates(
+        start: date, roll: date, maturity: date, months_per_period: int, roll_type: RollType, calendar: Calendar
+    ) -> List[date]:
+        """Generate dates in forward order."""
+        dates = []
+        if roll != start:
+            dates.append(roll_type.roll(roll, calendar))
+
+        current = roll
+        while current < maturity:
+            current = DateMath.add_tenor(roll, len(dates) * months_per_period, TenorUnit.MONTH, roll_type, calendar)
+            if current < maturity:
+                dates.append(current)
+
+        if maturity > roll:
+            dates.append(roll_type.roll(maturity, calendar))
+        return dates
+
+    @staticmethod
+    def _generate_reverse_dates(
+        start: date, roll: date, maturity: date, months_per_period: int, roll_type: RollType, calendar: Calendar
+    ) -> List[date]:
+        """Generate dates in reverse order."""
+        dates = [roll_type.roll(maturity, calendar)]
+        current = maturity
+
+        while current > roll:
+            current = DateMath.add_tenor(
+                maturity, -len(dates) * months_per_period, TenorUnit.MONTH, roll_type, calendar
+            )
+            if current > roll:
+                dates.insert(0, current)
+
+        if roll > start:
+            dates.insert(0, roll)
+        return dates
+
+    @staticmethod
     def generate_dates(
         start: date,
         roll: date,
@@ -110,39 +148,16 @@ class DateMath:
             raise ValueError('Dates must be in order: start <= roll <= maturity')
 
         frequency = frequency or Frequency.QUARTERLY
+        if frequency in (Frequency.ONCE, Frequency.CONTINUOUS, Frequency.OTHER):
+            raise ValueError('Frequency must not be ONCE, CONTINUOUS, or OTHER for date generation')
+
         roll_type = roll_type or RollType.MODIFIED_FOLLOWING
         calendar = calendar or Calendar('default', set())
+        months_per_period = int(frequency.period_months())
 
-        dates = []
-        months_per_period = 12 // abs(frequency.value)
-
-        if not reverse:
-            if roll != start:
-                dates.append(roll_type.roll(roll, calendar))
-
-            current = roll
-            while current < maturity:
-                current = DateMath.add_tenor(roll, len(dates) * months_per_period, TenorUnit.MONTH, roll_type, calendar)
-                if current < maturity:
-                    dates.append(current)
-
-            if maturity > roll:
-                dates.append(roll_type.roll(maturity, calendar))
-        else:
-            dates.append(roll_type.roll(maturity, calendar))
-
-            current = maturity
-            while current > roll:
-                current = DateMath.add_tenor(
-                    maturity, -len(dates) * months_per_period, TenorUnit.MONTH, roll_type, calendar
-                )
-                if current > roll:
-                    dates.insert(0, current)
-
-            if roll > start:
-                dates.insert(0, roll)
-
-        return dates
+        return (DateMath._generate_reverse_dates if reverse else DateMath._generate_forward_dates)(
+            start, roll, maturity, months_per_period, roll_type, calendar
+        )
 
     @staticmethod
     def add_business_days(from_date: date, days: int, calendar: Calendar, adjust_up: bool = True) -> date:

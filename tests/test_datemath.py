@@ -120,3 +120,17 @@ def test_helper_functions():
     assert _add_years(base_date, 1) == date(2025, 1, 31)
     assert _add_years(date(2024, 2, 29), 1) == date(2025, 2, 28)  # non-leap year
     assert _add_years(base_date, -1) == date(2023, 1, 31)
+
+
+def test_generate_dates_invalid_frequencies():
+    """Test date generation with invalid frequencies."""
+    start = date(2024, 1, 1)
+    roll = date(2024, 1, 15)
+    maturity = date(2024, 12, 31)
+
+    invalid_frequencies = [Frequency.ONCE, Frequency.CONTINUOUS, Frequency.OTHER]
+    error_msg = 'Frequency must not be ONCE, CONTINUOUS, or OTHER for date generation'
+
+    for freq in invalid_frequencies:
+        with pytest.raises(ValueError, match=error_msg):
+            DateMath.generate_dates(start, roll, maturity, frequency=freq)

@@ -3,8 +3,8 @@ name: Publish to PyPI
 on:
   push:
     tags:
-      - 'v*'  # Trigger on version tags
- 
+    - 'v*' # Trigger on version tags
+
   # Allow manual testing without creating a tag
   workflow_dispatch:
     inputs:
@@ -17,75 +17,75 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-   
+
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-     
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-     
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: latest
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-     
-      - name: Set version from tag
-        if: github.event_name == 'push'
-        run: |
-          # Extract version from git tag (remove 'v' prefix)
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "Setting version to $VERSION"
-          poetry version $VERSION
-     
-      - name: Install dependencies
-        run: poetry install --no-interaction
-     
-      - name: Run tests
-        run: poetry run pytest
-     
-      - name: Build package
-        run: poetry build
-     
-      - name: Verify package version matches tag
-        if: github.event_name == 'push'
-        run: |
-          TAG_VERSION=${GITHUB_REF#refs/tags/v}
-          PACKAGE_VERSION=$(poetry version -s)
-          if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
-            echo "Error: Tag version ($TAG_VERSION) does not match package version ($PACKAGE_VERSION)"
-            exit 1
-          fi
-     
-      - name: Publish to TestPyPI
-        if: github.event_name == 'push' || inputs.dry_run
-        env:
-          POETRY_PYPI_TOKEN_TESTPYPI: ${{ secrets.TESTPYPI_TOKEN }}
-        run: |
-          poetry config repositories.testpypi https://test.pypi.org/legacy/
-          poetry publish -r testpypi
-     
-      - name: Wait for TestPyPI package to be available
-        if: github.event_name == 'push' || inputs.dry_run
-        run: |
-          sleep 60  # Wait for TestPyPI to process the upload
-     
-      - name: Install from TestPyPI and test
-        if: github.event_name == 'push' || inputs.dry_run
-        run: |
-          package_name=$(poetry version | cut -d' ' -f1)
-          version=$(poetry version -s)
-          python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ "${package_name}==${version}"
-          # Add basic import test
-          python -c "import qftools"
-     
-      - name: Publish to PyPI
-        if: github.event_name == 'push' && success()  # Only publish on tag push
-        env:
-          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
-        run: poetry publish
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+
+    - name: Set version from tag
+      if: github.event_name == 'push'
+      run: |
+        # Extract version from git tag (remove 'v' prefix)
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "Setting version to $VERSION"
+        poetry version $VERSION
+
+    - name: Install dependencies
+      run: poetry install --no-interaction
+
+    - name: Run tests
+      run: poetry run pytest
+
+    - name: Build package
+      run: poetry build
+
+    - name: Verify package version matches tag
+      if: github.event_name == 'push'
+      run: |
+        TAG_VERSION=${GITHUB_REF#refs/tags/v}
+        PACKAGE_VERSION=$(poetry version -s)
+        if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+          echo "Error: Tag version ($TAG_VERSION) does not match package version ($PACKAGE_VERSION)"
+          exit 1
+        fi
+
+    - name: Publish to TestPyPI
+      if: github.event_name == 'push' || inputs.dry_run
+      env:
+        POETRY_PYPI_TOKEN_TESTPYPI: ${{ secrets.TESTPYPI_TOKEN }}
+      run: |
+        poetry config repositories.testpypi https://test.pypi.org/legacy/
+        poetry publish -r testpypi
+
+    - name: Wait for TestPyPI package to be available
+      if: github.event_name == 'push' || inputs.dry_run
+      run: |
+        sleep 60  # Wait for TestPyPI to process the upload
+
+    - name: Install from TestPyPI and test
+      if: github.event_name == 'push' || inputs.dry_run
+      run: |
+        package_name=$(poetry version | cut -d' ' -f1)
+        version=$(poetry version -s)
+        python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ "${package_name}==${version}"
+        # Add basic import test
+        python -c "import qftools"
+
+    - name: Publish to PyPI
+      if: github.event_name == 'push' && success() # Only publish on tag push
+      env:
+        POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
+      run: poetry publish

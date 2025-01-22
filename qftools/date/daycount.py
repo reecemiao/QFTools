@@ -155,14 +155,15 @@ class DayCount(Enum):
         """
         Actual/365 ICMA day count.
 
-        This convention is similar to ACT/ACT ICMA but uses 365 as a fixed denominator. It has special
-        handling for periods that exceed the standard length.
+        This convention divides the actual number of days by 365, then divides by the frequency.
+        It's commonly used for money market instruments.
 
         Key features:
-        1. Uses actual days for numerator
-        2. Uses 365 as fixed denominator
-        3. Special handling for long periods
-        4. Considers payment frequency for period calculations
+        1. Uses actual days in numerator
+        2. Uses 365 days in denominator
+        3. Considers payment frequency for period calculations
+        4. Special handling for non-aligned periods
+        5. Different calculation for forward/backward periods
 
         Parameters
         ----------
@@ -171,7 +172,7 @@ class DayCount(Enum):
         end : date
             End date of the period
         maturity : date
-            Final maturity date of the instrument
+            Final maturity date
         payment : date
             Next payment date
         frequency : Frequency
@@ -182,11 +183,8 @@ class DayCount(Enum):
         float
             Year fraction according to ACT/365 ICMA convention
         """
-        if not payment or not maturity:
-            raise ValueError('Payment and maturity dates required for ACT/365 ICMA')
-
-        freq_factor = frequency.value if frequency.value > 0 else -1 / frequency.value
-        months_per_period = int(12 // freq_factor)
+        freq_factor = frequency.annual_frequency()
+        months_per_period = int(frequency.period_months())
 
         # Check if dates align with frequency
         if cls._check_period_alignment(start, payment, months_per_period) and cls._check_date_alignment(start, payment):
@@ -366,13 +364,13 @@ class DayCount(Enum):
         float
             Year fraction according to ACT/ACT ICMA convention
         """
-        freq_factor = frequency.value if frequency.value > 0 else -1 / frequency.value
-        months_per_period = int(12 // freq_factor)
+        freq_factor = frequency.annual_frequency()
+        months_per_period = int(frequency.period_months())
 
         if cls._check_period_alignment(start, payment, months_per_period) and cls._check_date_alignment(start, payment):
             return (end - start).days / ((payment - start).days * freq_factor)
 
-        current, target, direction = cls._get_period_dates(start, payment, maturity, months_per_period)
+        current, target, direction = cls._get_period_dates(start, payment, maturity)
 
         total_fraction = 0.0
         while direction * (current - target).days < 0:
@@ -382,7 +380,7 @@ class DayCount(Enum):
 
             days = (period_end - period_start).days
             if days > 0:
-                total_fraction += days / (next_date - current).days
+                total_fraction += direction * days / (next_date - current).days
 
             current = next_date
 
@@ -553,6 +551,10 @@ class DayCount(Enum):
         """Validate and calculate 30E/360 ISDA day count."""
         if maturity is None:
             raise ValueError('Maturity date required for 30E/360 ISDA calculations')
+        if maturity < start:
+            raise ValueError('Maturity date must be greater than start date for 30E/360 ISDA')
+        if maturity < end:
+            raise ValueError('Maturity date must be greater than end date for 30E/360 ISDA')
         return self._thirty_360_isda(start, end, maturity)
 
     def _validate_and_calc_business(self, start: date, end: date, calendar: Optional[Calendar]) -> float:
@@ -567,7 +569,18 @@ class DayCount(Enum):
         """Validate and calculate ACT/ACT ICMA day count."""
         if not all([maturity, payment, frequency]):
             raise ValueError('Maturity, payment dates and frequency required for ACT/ACT ICMA')
-        if frequency in (Frequency.ONCE, Frequency.BIWEEKLY, Frequency.WEEKLY, Frequency.DAILY, Frequency.OTHER):
+        if maturity < payment:
+            raise ValueError('Maturity date must be greater than payment date for ACT/ACT ICMA')
+        if payment < end:
+            raise ValueError('Payment date must be greater than end date for ACT/ACT ICMA')
+        if frequency in (
+            Frequency.ONCE,
+            Frequency.BIWEEKLY,
+            Frequency.WEEKLY,
+            Frequency.DAILY,
+            Frequency.OTHER,
+            Frequency.CONTINUOUS,
+        ):
             raise ValueError('Frequency must not be ONCE, BIWEEKLY, WEEKLY, DAILY, or OTHER for ACT/ACT ICMA')
         return self._act_act_icma(start, end, maturity, payment, frequency)
 
@@ -577,7 +590,18 @@ class DayCount(Enum):
         """Validate and calculate ACT/365 ICMA day count."""
         if not all([maturity, payment, frequency]):
             raise ValueError('Maturity, payment dates and frequency required for ACT/365 ICMA')
-        if frequency in (Frequency.ONCE, Frequency.BIWEEKLY, Frequency.WEEKLY, Frequency.DAILY, Frequency.OTHER):
+        if maturity < payment:
+            raise ValueError('Maturity date must be greater than payment date for ACT/365 ICMA')
+        if payment < end:
+            raise ValueError('Payment date must be greater than end date for ACT/365 ICMA')
+        if frequency in (
+            Frequency.ONCE,
+            Frequency.BIWEEKLY,
+            Frequency.WEEKLY,
+            Frequency.DAILY,
+            Frequency.OTHER,
+            Frequency.CONTINUOUS,
+        ):
             raise ValueError('Frequency must not be ONCE, BIWEEKLY, WEEKLY, DAILY, or OTHER for ACT/365 ICMA')
         return self._act_365_icma(start, end, maturity, payment, frequency)
 
@@ -601,15 +625,13 @@ class DayCount(Enum):
         """Get new month after adding number of months."""
         total = month + number
         if total <= 0:
-            return total % 12 + 12
+            return total % 12
         return (total - 1) % 12 + 1
 
     @staticmethod
     def _get_new_year(year: int, month: int, number: int) -> int:
         """Get new year after adding number of months."""
         total = month + number
-        if total <= 0:
-            return year - 1 + total // 12
         return year + (total - 1) // 12
 
     @staticmethod
