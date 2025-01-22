@@ -1,6 +1,6 @@
 [project]
 name = "qftools"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python Toolkit for Quantitative Finance"
 authors = [
     {name = "Reece Miao",email = "reece.miao@outlook.com"}
